@@ -365,13 +365,111 @@
       }
       ```
 
-      
-
   - 优势
 
     - 可以是真实角色的操作更加纯粹,不用关注公共业务
-    - 公共业务交给代理角色,实现了业务的分工
+  - 公共业务交给代理角色,实现了业务的分工
     - 公共业务发生拓展的时候,更方便集中管理
     - 一个动态代理类代理的是一个接口,一般就是一类业务
     - 一个动态代理类可以代理多个类,只要实现了同一个接口
+
+# 9.AOP
+
+### 9.1 AOP在spring中的作用
+
+提供声明式事务,允许用户自定义切面
+
+- 横切关注点:跨应用多个模块的方法或功能,及时,与我们业务无关的,但是需要关注的部分,例如日志,缓存,事物等
+- 切面(Aspect):横切关注点被模块化的对象,是一个类
+- 通知(Advice):横切关注点要完成的工作,类中的一个方法
+- 目标(Target):被通知对象  原对象
+- 代理(Proxy):原对象执行通知后创建的代理对象
+- 切入点(PointCut):切面通知执行的"地点"
+- 连接点(JointPoint):与切入点匹配的执行点
+
+### 9.2 使用Spring实现AOP
+
+- 使用AOP需要导入一个依赖包
+
+  ```xml
+  <dependency>
+    <groupId>org.aspectj</groupId>
+    <artifactId>aspectjweaver</artifactId>
+    <version>1.9.6</version>
+  </dependency>
+  ```
+
+- 方式一:使用Spring的接口
+
+  - 编写自己的通知(Advice)类,实现通知(Advice)的接口,并交给Spring管理
+
+    - AfterReturningAdvice,MethodBeforeAdvice等接口...
+
+  - xml中配置
+
+    ```xml
+    <bean id="afterlog" class="com.sowevo.log.AfterReturnLog"/><!--通知(Advice)类-->
+    <bean id="beforelog" class="com.sowevo.log.BeforeLog"/>    <!--通知(Advice)类-->
+    <aop:config>
+      <!--execution 要执行的位置!-->
+      <aop:pointcut id="point" expression="execution(* com.sowevo.service.UserService.*(..))"/>
+      <aop:advisor advice-ref="afterlog" pointcut-ref="point"/>
+      <aop:advisor advice-ref="beforelog" pointcut-ref="point"/>
+    </aop:config>
+    ```
+
+- 方式二:自定义来实现AOP
+
+  - 编写自定义的通知类,并交给Spring管理
+
+  - xml中配置
+
+    ```xml
+    <bean id="diy" class="com.sowevo.diy.DiyPointCut"/>
+    <aop:config>
+      <!--自定义切面-->
+      <aop:aspect ref="diy">
+        <!--切入点-->
+        <aop:pointcut id="point" expression="execution(* com.sowevo.service.UserService.*(..))"/>
+        <!--通知-->
+        <aop:after method="after" pointcut-ref="point"/>
+        <aop:before method="before" pointcut-ref="point"/>
+      </aop:aspect>
+    </aop:config>
+    ```
+
+- 方式三:使用注解实现
+
+  - 编写自定义的通知类,并交给Spring管理
+
+    ```java
+    @Aspect
+    public class AnnottationPointCut{
+        @Before("execution(* com.sowevo.service.UserService.*(..))")
+        public void before(){
+            System.err.println("方法执行前~~");
+        }
+        @After("execution(* com.sowevo.service.UserService.*(..))")
+        public void after(){
+            System.err.println("方法执行后~~");
+        }
+        @Around("execution(* com.sowevo.service.UserService.*(..))")
+        public void around(ProceedingJoinPoint proceedingJoinPoint) throws Throwable {
+            System.err.println("方法环绕前~~");
+            proceedingJoinPoint.proceed();
+            System.err.println("方法环绕后~~");
+        }
+    }
+    ```
+
+  - xml中配置开启AOP注解支持
+
+    ```xml
+    <bean id="annoPoint" class="com.sowevo.diy.AnnottationPointCut"/>
+    <aop:aspectj-autoproxy/>
+    ```
+
+    
+
+
 
