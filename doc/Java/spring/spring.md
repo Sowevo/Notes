@@ -469,7 +469,50 @@
     <aop:aspectj-autoproxy/>
     ```
 
-    
+# 10. Spring整合Mybatis
 
+- 步骤
+  1. 导入相关jar包
+     - junit
+     - mybatis
+     - mysql数据库
+     - Spring
+     - aop织入
+     - mybatis-spring
+  2. 配置文件
+  3. 测试
 
+# 11. spring中的事物管理
 
+- 声明式事物(推荐)
+
+  ```xml
+  <!--配置声明式事物-->
+  <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="datasource"/>
+  </bean>
+  
+  <!--结合aop实现事物的织入-->
+  <tx:advice id="txadvice" transaction-manager="transactionManager">
+    <!--配置事务的传播特性 propagation参数的配置
+          REQUIRED：支持当前事务，如果当前没有事务，就新建一个事务。这是最常见的选择。
+          SUPPORTS：支持当前事务，如果当前没有事务，就以非事务方式执行。
+          MANDATORY：支持当前事务，如果当前没有事务，就抛出异常。
+          REQUIRES_NEW：新建事务，如果当前存在事务，把当前事务挂起。
+          NOT_SUPPORTED：以非事务方式执行操作，如果当前存在事务，就把当前事务挂起。
+          NEVER：以非事务方式执行，如果当前存在事务，则抛出异常。
+          NESTED：支持当前事务，如果当前事务存在，则执行一个嵌套事务，如果当前没有事务，就新建一个事务。
+          -->
+    <tx:attributes>
+      <tx:method name="add" propagation="REQUIRED"/>
+      <tx:method name="delete" propagation="REQUIRED"/>
+      <tx:method name="*" propagation="REQUIRED"/>
+    </tx:attributes>
+  </tx:advice>
+  <aop:config>
+    <aop:pointcut id="point" expression="execution(* com.sowevo.mapper.*.*(..))"/>
+    <aop:advisor pointcut-ref="point" advice-ref="txadvice"/>
+  </aop:config>
+  ```
+
+- 编程式事物
