@@ -119,6 +119,43 @@ macOS下默认的命令行shell环境为Bash，同时macOS也自带zsh shell环�
   $ sh -c "$(curl -fsSL https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
   ```
 
+# [youtube-dl](https://github.com/ytdl-org/youtube-dl)
+
+youtube-dl是一款开源、命令行界面的下载器，最初旨在从Youtube上下载视频，现在也支持其它网站。该项目也是GitHub星标数最高的项目之一
+
+- 安装
+
+  - MAC
+
+    ```shell
+    $ brew install youtube-dl
+    ```
+
+  - Other
+
+    ```shell
+    $ pip install --upgrade youtube-dl
+    ```
+
+- 安装FFMPEG可以实现格式转换功能
+
+- [全局配置文件](https://github.com/ytdl-org/youtube-dl#configuration)
+
+  - 配置文件路径
+
+    `~/.config/youtube-dl/config`
+
+  - 参考配置
+
+    ```properties
+    # 使用指定的HTTP/HTTPS/SOCKS代理,不需要的不配置
+    --proxy 10.0.0.1:7890
+    # 指定默认的保存位置
+    -o "~/Downloads/youtube-dl/%(title)s-%(id)s.%(ext)s"
+    # 打印日志
+    -v
+    ```
+
 ## 其他软件
 
 ```bash
