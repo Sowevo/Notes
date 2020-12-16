@@ -220,7 +220,7 @@ public class ResultController {
   </mvc:annotation-driven>
   ```
 
-# 7. 拦截器与过滤器的不同!
+# 7. <font color=red>拦截器与过滤器的不同</font>
 
 - 不同点
   - 拦截器(Interceptor)是Spring的,过滤器 (Filter)是Servlet的
