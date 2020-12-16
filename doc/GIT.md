@@ -131,13 +131,13 @@ git config --global user.email i@sowevo.com
 - 更新上游仓库main分支的代码（pull操作实际上是 `fetch+merge`）
 
   ```shell
-  $ git pull upstream main
+  $ git pull upstream main   # 分支名,视具体情况决定 可能是master或者其他
   ```
 
 - 将从源头仓库更新后的代码推送到你自己的github仓库
 
   ```shell
-  $ git push origin main 
+  $ git push origin main # 分支名,视具体情况决定 可能是master或者其他
   ```
 
 - 这样你就能快速的从主仓库拉取最新的代码，并更新到你自己的仓库里了。
