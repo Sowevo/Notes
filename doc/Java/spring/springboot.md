@@ -200,15 +200,41 @@ person:
 
     - 模板位置: html页面放入`classpath:/templates/`目录下
 
+    - 首先要引入Thymeleaf的命名空间
+
+      ```html
+      <html xmlns:th="http://www.thymeleaf.org">
+      ```
+
     - 语法
 
       ```html
-          <!--th:text  文本-->
-          <div th:text="${msg}"></div>
-          <!--th:utext 文本,进行转义-->
-          <div th:utext="${msg}"></div>
-          <!--th:each  对象遍历-->
-          <h3 th:each="name:${names}" th:text="${name}"></h3>
+      <!--th:text  文本-->
+      <div th:text="${msg}"></div>
+      <!--th:utext 文本,进行转义-->
+      <div th:utext="${msg}"></div>
+      <!--th:each  对象遍历-->
+      <h3 th:each="name:${names}" th:text="${name}"></h3>
+      <!--使用th:href="@{}"接管静态资源-->
+      <link th:href="@{/css/bootstrap.min.css}" rel="stylesheet">
+      <!--使用#{login.tip}实现国际化-->
+      <h1 class="h3" th:text="#{login.tip}"></h1>
+      
+      
+      <!--使用th:fragment="top"注册模板-->
+      <nav class="navbar" th:fragment="top">
+      <!--使用th:replace或th:insert引用模板-->  
+      <div th:replace="~{/commons/commons::sidebar}"/>
+        
+      <!--注册模板时传递参数-->
+      <a th:class="${active=='dashboard'?'nav-link ac':'nav-link'}"/>  
+      <div th:replace="~{/commons/commons::sidebar(active='dashboard')}"/>
+      
+        
+      <!--三元表达式-->  
+      <td th:text="${emp.getGender()==0?'女':'男'}"/>
+      <!--日期格式化-->
+      <td th:text="${#dates.format(emp.getBirth(),'yyyy-mm-dd HH:mm:ss')}"/>  
       ```
 
   - 装配扩展SpringMVC
@@ -219,7 +245,82 @@ person:
 
   - 拦截器
 
+    - 自己实现拦截器实现HandlerInterceptor
+
+    - 在MVC配置类中配置自己的拦截器
+
+      ```java
+      //自己实现拦截器实现HandlerInterceptor
+      //在MVC配置类中配置自己的拦截器
+      public class LoginInterceptor implements HandlerInterceptor {
+          @Override
+          public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+              Object UserInfo = request.getSession().getAttribute("UserInfo");
+              if (UserInfo==null){
+                  request.setAttribute("msg","请登录");
+                  request.getRequestDispatcher("/index").forward(request,response);
+                  return false;
+              }
+              return true;
+          }
+      }
+      //-------------------------
+      @Configuration
+      public class MyMvcConfig implements WebMvcConfigurer {
+          @Override
+          public void addViewControllers(ViewControllerRegistry registry) {
+             registry.addViewController("/main.html").setViewName("dashboard");
+          }
+      }  
+      ```
+
+      
+
   - 国际化!
+
+    - 配置i18n文件
+
+      ```yaml
+      spring:
+        messages:
+          # 国际化文件位置
+          basename: i18n.login
+      ```
+
+    - 实现自定义国际化环境的切换
+
+      - 自己实现LocaleResolver
+      - 在WebMvcConfigurer中注入自己实现的LocaleResolver
+
+      ```java
+      //自己实现LocaleResolver
+      //在MVC配置类中注入自己实现的LocaleResolver
+      public class LocaleConfig implements LocaleResolver {
+          @Override
+          public Locale resolveLocale(HttpServletRequest request) {
+              String l = request.getParameter("l");
+              if (StringUtils.isNotEmpty(l)){
+                  try {
+                      String[] s = l.split("_");
+                      return new Locale(s[0],s[1]);
+                  } catch (Exception e) {
+                      e.printStackTrace();
+                  }
+              }
+              return Locale.getDefault();
+          }
+      }
+      //------------------
+      @Configuration
+      public class MyConfig implements WebMvcConfigurer {
+          @Bean
+          public LocaleResolver localeResolver(){
+              return new LocaleConfig();
+          }
+      }
+      ```
+
+      
 
 ## SpringBoot新的注解
 
