@@ -59,5 +59,13 @@ Maven中默认打包 resource下的资源文件。如果我们的mapper.xml文�
 
 # mybatis的缓存.
 
-- //TODO
+- 一级缓存
+  - 默认开启
+  - 作用范围是一个SqlSession
+  - 手动进行清空或者此Session进行更新操作,缓存被清空
+  - SqlSession关闭后缓存销毁
+- 二级缓存
+  - 默认关闭,要手动开启
+  - 作用范围是一个Mapper文件
+  - 不推荐使用!
 
