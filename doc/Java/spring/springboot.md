@@ -472,9 +472,238 @@ person:
 
     ![img](https://up.sowevo.com/img/20201217203702.png)
 
+### 任务相关
 
+- 异步任务
+  - 手动创建线程
+  - Spring支持的
+    - 异步任务method 上添加@Async注解
+    - 启动类加上@EnableAsync注解
 
+- 邮件发送
 
+  - 导包
+
+    ```xml
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
+    ```
+
+  - 配置
+
+    ```yaml
+    spring:
+      mail:
+        password: ydcrkuadsflsdfe
+        username: i@sowevo.com
+        host: smtp.qq.com
+        properties:
+          mail.smtp.ssl.enable: true
+    ```
+
+  - 发邮件
+
+    ```java
+    @Autowired
+    JavaMailSenderImpl mail;
+    @Test
+    void contextLoads() {
+      SimpleMailMessage msg = new SimpleMailMessage();
+      msg.setSubject("小花~");
+      msg.setText("今天天气不错呀!");;
+      msg.setFrom("i@sowevo.com");
+      msg.setTo("sowevo@gmail.com");
+      mail.send(msg);
+    }
+    ```
+
+- 定时任务
+
+  - 启动类加上@EnableScheduling注解
+
+  - 任务method 上添加@Scheduled注解
+
+    ```java
+    //3秒一次,如果3秒内任务没有结束,会在任务结束之后在等待3秒在执行
+    @Scheduled(cron = "*/3 * * * * ?")  
+    //上一次任务结束3秒后在执行下一次
+    @Scheduled(fixedDelay=3000) 
+    @Scheduled(fixedDelayString = "3000") 
+    //上一次任务开始3秒后在执行下一次
+    @Scheduled(fixedRate=3000) 
+    @Scheduled(fixedDelayString = "3000")  
+    //initialDelay项目启动10秒后开始执行任务
+    @Scheduled(fixedRate=3000,initialDelay=10000) 
+    //同一个job不能同时执行
+    //有多个job时,要同时执行,需要修改默认的 scheduled池大小 spring.task.scheduling.pool.size=10
+    ```
+
+### 集成Redis
+
+- SpringBoot2.x之后默认的redis驱动被替换成了lettuce
+  - jedis采用的直连,多线程不安全,BIO模式
+  - lettuce采用的netty,实例可以多线程共享,不存在线程不安全的问题,NIO模式
+
+- 依赖
+
+  ```xml
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+  </dependency>
+  ```
+
+- 配置
+
+  ```yaml
+  spring:
+    redis:
+      host: 10.0.0.2
+      port: 6379
+  ```
+
+- 简单的使用
+
+  ```java
+  @Autowired
+  RedisTemplate redisTemplate;
+  @Test
+  void contextLoads() {
+    //redisTemplate 操作不同的数据类型,命令和api基本一致
+    //redisTemplate.opsForValue() 字符串
+    //redisTemplate.opsForList()  list
+    //redisTemplate.opsForSet()
+    //redisTemplate.opsForHash()
+    //redisTemplate.opsForZSet()
+  
+    //获取redis的链接对象
+    //RedisConnection connection = redisTemplate.getConnectionFactory().getConnection();
+    //connection.flushDb();
+    //connection.flushAll();
+  
+    redisTemplate.opsForValue().set("key","床前明月光");
+    System.err.println(redisTemplate.opsForValue().get("key"));
+  }
+  ```
+
+- 对象保存到Redis
+
+  - 对象保存的时候要实现序列化Serializable
+  - 一般model类都要实现序列化
+
+- 最佳实践(一组工具类)
+
+  <script src="https://gist.github.com/Sowevo/02b79b99dfc97852a457f338e17c439d.js"></script>
+
+### 分布式+Dubbo+Zookeeper+SpringBoot
+
+- Dubbo概述
+
+  ![image-20201218193036943](https://up.sowevo.com/img/20201218193037.png)
+
+  | 节点                 | 角色说明                                                     |
+  | -------------------- | ------------------------------------------------------------ |
+  | 服务提供者`Provider` | 暴露服务的服务提供方,启动时向注册中心注册自己提供的服务      |
+  | 服务消费者`Consumer` | 调用远程服务的服务消费方,启动时向注册中心订阅自己所需的服务,从注册中心提供的提供者中选一台(基于软负载均衡)进行调用,如果失败,再选一个 |
+  | 注册中心`Registry`   | 服务注册与发现的注册中心,提供提供者的信息给消费者            |
+  | 监控中心`Monitor`    | 统计服务的调用次数和调用时间的监控中心                       |
+
+  ##### 调用关系说明
+
+  1. 服务容器负责启动，加载，运行服务提供者。
+  2. 服务提供者在启动时，向注册中心注册自己提供的服务。
+  3. 服务消费者在启动时，向注册中心订阅自己所需的服务。
+  4. 注册中心返回服务提供者地址列表给消费者，如果有变更，注册中心将基于长连接推送变更数据给消费者。
+  5. 服务消费者，从提供者地址列表中，基于软负载均衡算法，选一台提供者进行调用，如果调用失败，再选另一台调用。
+  6. 服务消费者和提供者，在内存中累计调用次数和调用时间，定时每分钟发送一次统计数据到监控中心。
+
+- Dubbo-admin服务监控
+
+  - 克隆[项目](https://github.com/apache/dubbo-admin/tree/master)自己打包:注意要用master分支,记得修改配置
+  - 启动打好的jar包
+
+### 项目集成Dubbo
+
+- 启动zookeeper服务
+
+- 启动Dubbo-admin监控服务(非必选)
+
+- 导入依赖(提供者与消费者均要导入此依赖)
+
+  ```xml
+  <dependency>
+    <groupId>org.apache.dubbo</groupId>
+    <artifactId>dubbo-spring-boot-starter</artifactId>
+    <version>2.7.8</version>
+  </dependency>
+  <dependency>
+    <groupId>org.apache.dubbo</groupId>
+    <artifactId>dubbo-dependencies-zookeeper</artifactId>
+    <version>2.7.8</version>
+    <type>pom</type>
+  </dependency>
+  ```
+
+- 配置文件:注册中心与服务名等
+
+  ```yaml
+  # 提供者
+  server:
+    port: 8081
+  dubbo:
+    application:
+      # 自己的名字
+      name: provider-server
+    registry:
+      address: zookeeper://10.0.0.2:2181
+    scan:
+      # 服务的包扫描
+      base-packages: com.sowevo.service
+  ---
+  # 消费者
+  server:
+    port: 8082
+  dubbo:
+    application:
+      # 自己的名字
+      name: consumer-service
+    registry:
+      address: zookeeper://10.0.0.2:2181
+  ```
+
+- 代码
+
+  - 提供者
+
+    ```java
+    @Service
+    @DubboService
+    public class TicketServiceImpl implements TicketService{
+        @Override
+        public String getTicket() {
+            String ticket = RandomUtil.randomString(8);
+            System.err.println("生成票号====>"+ticket);
+            return ticket;
+        }
+    }
+    ```
+
+  - 消费者
+
+    ```java
+    @Service
+    public class UserService {
+        @DubboReference //从提供者拷贝过来的接口
+        TicketService ticketService;
+        public String buyTicket(){
+            String ticket = ticketService.getTicket();
+            System.err.println("获得票号====>"+ticket);
+            return ticket;
+        }
+    }
+    ```
 
 ## SpringBoot新的注解
 
@@ -484,5 +713,6 @@ person:
   - @Email
   - @Size(max, min)
   - ....
+- @Async搭配@EnableAsync 启动异步任务的支持~
 
 - @Mapper 整合mybatis时使用
