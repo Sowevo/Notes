@@ -216,7 +216,7 @@ SpringCloud生态:
 
 - 两个服务拥有共同的API包,其中包含Model的定义
 
-### Eureka
+# Eureka
 
 - 三个角色
   - Eureka Service:Eureka的注册中心
@@ -272,7 +272,7 @@ SpringCloud生态:
       register-with-eureka: false # 是否在eureka服务器上注册
       fetch-registry: false       # 是否从eureka服务器上获取信息
       service-url:
-              defaultZone: http://eureka01.66-77.cc:7001/eureka,http://eureka02.66-77.cc:7002/eureka,http://eureka03.66-77.cc:7003/eureka
+        defaultZone: http://eureka01.66-77.cc:7001/eureka,http://eureka02.66-77.cc:7002/eureka,http://eureka03.66-77.cc:7003/eureka
   ```
 
 - 服务提供者
@@ -296,11 +296,83 @@ SpringCloud生态:
      eureka:
        client:
          service-url:
-           # 服务器地址,集群填一个就行
+           # 服务器地址,集群地址
            defaultZone: http://eureka01.66-77.cc:7001/eureka/
        instance:
          # 修改注册时使用的默认描述信息
          instance-id: SpringCloud-provider-dept-8001
+     ```
+
+- 服务调用者
+
+  1. 依赖
+
+     ```xml
+     <!--eureka-client 包含了 Ribbon的依赖-->
+     <dependency>
+       <groupId>org.springframework.cloud</groupId>
+       <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+       <version>2.2.6.RELEASE</version>
+     </dependency>
+     ```
+
+  2. 启动类上标记**@EnableEurekaClient**
+
+  3. 配置文件
+
+     ```yaml
+     eureka:
+       client:
+         # 消费者不用注册自己
+         register-with-eureka: false
+         service-url:
+           # 注册中心地址
+           defaultZone: http://eureka01.66-77.cc:7001/eureka,http://eureka02.66-77.cc:7002/eureka,http://eureka03.66-77.cc:7003/eureka
+     ```
+
+  4. 调用
+
+     配置RestTemplate
+
+     ```java
+     @Configuration
+     public class RestTemplateConfig {
+         @Bean
+         /**对RestTemplate启动负载均衡,基于Ribbon*/
+         @LoadBalanced
+         public RestTemplate restTemplate(){
+             return new RestTemplate();
+         }
+         @Bean
+         /**
+          * 配置一下负载均衡的规则
+          * 默认使用的是RoundRobinRule:轮询
+          * AvailabilityFilteringRule:可用过滤后轮询
+          * RandomRule:随机
+          * RetryRule:一定时间内重试
+          * */
+         public IRule configRule(){
+             return new RandomRule();
+         }
+     }
+     ```
+
+     调用RestTemplate
+
+     ```java
+     @RestController
+     @RequestMapping("/consumer")
+     public class DeptConsumerController {
+         @Autowired
+         RestTemplate restTemplate;
+         /**将前缀改为负载均衡总获取到的服务id,对应的是服务提供者的spring.application.name配置*/
+         private static final String REST_URL_PREFIX="http://SPRINGCLOUD-PROVIDER-DEPT";
+     
+         @PostMapping("/dept")
+         public boolean addDept(Dept dept){
+             return restTemplate.postForObject(REST_URL_PREFIX + "/dept", dept, Boolean.class);
+         };
+     }
      ```
 
 ### CAP原则
@@ -317,10 +389,381 @@ SpringCloud生态:
     - CP:牺牲可用性,保证一致性:例如支付宝
     - AP:牺牲强一致性,保证最终可用性,保证可用性:例如12306...
 
-### Zookeeper与Eureka的区别
+### Zookeeper与Eureka的对比
 
 根据CAP原则
 
-- Zookeeper实现的是CP
-- Eureka实现的是AP
+- Zookeeper保证的是CP
+  - 有leader机制,leader挂掉一个要重新选举leader,过程中服务不可用
+- Eureka保证的是AP
+  - 节点之间平等,挂掉一个节点就换另一个,直到全部都挂掉
+
+**Eureka可以很好的应对网络故障节点失联的情况,不会服务瘫痪~**
+
+# Ribbon
+
+### Ribbon是什么
+
+- SpringCloudRibbon是基于NetflixRibbon实现的**客户端负载均衡工具**
+
+- 简单的说，Ribbon是Netflix发布的开源项目， 主要功能是提供客户端的软件负载均衡算法，将NetFlix的中间层服务连接在一起.Ribbon的客户端组件提供一系列完整的配置项如:连接超时、重试等等。简单的说，就是在配置文件中列出LoadBalancer (简称LB:负载均衡)后面所有的机器，Ribbon会 自动的帮助你基于某种规则(如简单轮询，随机连接等等)去连接这些机器。我们也很容易使用Ribbon实现自定义的负载均衡算法!
+
+### 负载均衡
+
+- 负载均衡:将用户的请求平摊的分配到多台服务器上,从而实现系统的高可用(HA)
+- Nginx,Lvs等,Dubbo与SpringCloud中也提供了负载均衡
+- 分类:
+  - 集中式LB
+    - 在服务的消费方与提供方中间使用独立的LB设施,例如Nginx
+  - 进程式LB
+    - 将LB逻辑集成到消费方,消费方从注册中心的值哪些服务可用,然后从中选出一个合适的服务器
+    - **Ribbon数据进程式LB**,是一个类库,集成于消费方
+
+### Ribbon能干什么
+
+- 与Eureka搭配使用
+- 提供基于RestTemplate的HTTP客户端并且支持服务负载均衡功能
+
+# Feign
+
+feign是声明式的web service客户端，它让微服务之间的调用变得更简单了,类似controller调用service,只需要创建一个接口，然后添加注解即可!
+
+feign,主要是社区,大家都习惯面向接口编程。这个是很多开发人员的规范。
+
+### 调用微服务访问两种方法
+
+- 微服务名字[Ribbon]
+- 接口和注解[Feign,Dubbo]
+
+Feign底层还是调用的Ribbon
+
+### Feign的使用
+
+1. 导入依赖
+
+   ```xml
+   <!-- feign依赖 -->
+   <dependency>
+     <groupId>org.springframework.cloud</groupId>
+     <artifactId>spring-cloud-starter-openfeign</artifactId>
+     <version>2.2.6.RELEASE</version>
+   </dependency>
+   ```
+
+2. 启动类上标记**@EnableFeignClients(basePackages = {"com.sowevo.springcloud.service"})**并指定FeignClients的包
+
+3. 修改代码
+
+   ```java
+   //新建接口,要与provider中提供的服务对应
+   @Component
+   /**value 对应的是服务提供者的spring.application.name配置*/
+   @FeignClient(value = "SPRINGCLOUD-PROVIDER-DEPT-HYSTRIX")
+   public interface DeptService {
+       @PostMapping("/dept")
+       boolean addDept(Dept dept);
+       @GetMapping("/dept/{id}")
+       Dept queryDeptById(@PathVariable("id") Long id);
+       @GetMapping("/dept")
+       List<Dept> queryAll();
+   }
+   ===========================
+   //   Controller中注入接口,进行调用
+   @RestController
+   @RequestMapping("/consumer")
+   public class DeptConsumerController {
+       @Autowired
+       DeptService deptService;
+       @PostMapping("/dept")
+       public boolean addDept(Dept dept){
+           return deptService.addDept(dept);
+       };
+       @GetMapping("/dept/{id}")
+       public Dept queryDeptById(@PathVariable("id") Long id){
+           return deptService.queryDeptById(id);
+       };
+       @GetMapping("/dept")
+       public List<Dept> queryAll(){
+           return deptService.queryAll();
+       };
+   }
+   ```
+
+# Hystrix
+
+### 什么是Hystrix
+
+Hystrix是一个用于处理分布式系统的延迟和容错的开源库，在分布式系统里，许多依赖不可避免的会调用失败，比如超时，异常等，Hystrix能够保证在一个依赖出问题的情况下，不会导致整体服务失败,避免级联故障,以提高分布式系统的弹性。
+
+“断路器”本身是一种开关装置， 当某个服务单元发生故障之后,通过断路器的故障监控(类似熔断保险丝)，向调用方返回一个服务预期的，可处理的备选响应(FallBack) ，而不是长时间的等待或者抛出调用方法无法处理的异常，这样就可以保证了服务调用方的线程不会被长时间，不必要的占用，从而避免了故障在分布式系统中的蔓延，乃至雪崩
+
+### 能干嘛
+
+- 服务降级
+- 服务熔断
+- 服务限流
+- 服务监控
+- ...
+
+### 服务熔断与服务降级
+
+- 服务熔断
+  - 服务熔断在服务端处理
+  - 某个服务超时或异常,引起熔断
+
+- 服务降级
+  - 服务降级在客户端处理
+  - 从整体请求考虑,当某个服务熔断或关闭后,服务不再被调用
+  - 此时在客户端调用的是一个缺省值
+
+### 服务熔断使用
+
+- 在客户端,对一个方法提供一个备选
+
+1. 导入依赖
+
+   ```xml
+   <dependency>
+     <groupId>org.springframework.cloud</groupId>
+     <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+     <version>2.2.6.RELEASE</version>
+   </dependency>
+   ```
+
+2. 启动类上标记**@EnableHystrix**
+
+3. 修改代码   使用@HystrixCommand对异常方法指定备用方法,当发生异常时,会使用这个方法
+
+   ```java
+   @RestController
+   public class DeptController {
+       @Autowired
+       DeptService deptService;
+       // 使用@HystrixCommand对异常方法指定备用方法,当发生异常时,会使用这个方法
+       @HystrixCommand(fallbackMethod = "hystrixQueryDeptById")
+       @GetMapping("/dept/{id}")
+       public Dept queryDeptById(@PathVariable("id") Long id){
+           Dept dept = deptService.queryDeptById(id);
+           if (dept==null){
+               throw new RuntimeException("发生了异常!!!");
+           }
+           return dept;
+       };
+       public Dept hystrixQueryDeptById(@PathVariable("id") Long id){
+           return new Dept().setDeptno(id).setDname("此ID不存在啦").setDb_source("不存在");
+       };
+   }
+   ```
+
+### 服务降级使用
+
+- 在服务端,对接口提供一个备选接口,有用到feign
+
+1. 导入依赖
+
+   ```xml
+   <!-- hystrix依赖 -->
+   <dependency>
+     <groupId>org.springframework.cloud</groupId>
+     <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+   </dependency>
+   <!-- feign依赖 -->
+   <dependency>
+     <groupId>org.springframework.cloud</groupId>
+     <artifactId>spring-cloud-starter-openfeign</artifactId>
+     <version>2.2.6.RELEASE</version>
+   </dependency>
+   ```
+
+2. 启动类上加上注解**@EnableHystrix**
+
+3. 修改代码
+
+   ```java
+   //实现FallbackFactory,并在create中返回FeignClient接口的备选实现
+   @Component
+   public class DeptServiceFallbackFactory implements FallbackFactory {
+       @Override
+       public DeptService create(Throwable throwable) {
+           return new DeptService() {
+               @Override
+               public boolean addDept(Dept dept) {
+                   return false;
+               }
+               @Override
+               public Dept queryDeptById(Long id) {
+                   return new Dept().setDeptno(Long.MAX_VALUE).setDname("服务不可用").setDb_source("");
+               }
+               @Override
+               public List<Dept> queryAll() {
+                   return Collections.singletonList(new Dept().setDeptno(Long.MAX_VALUE).setDname("服务不可用").setDb_source(""));
+               }
+           };
+       }
+   }
+   ======================
+   //FeignClient接口中指定自己实现的FallbackFactory
+   @Component
+   /*
+   value 对应的是服务提供者的spring.application.name配置
+   fallbackFactory 指定的是HYSTRIX的FallbackFactory备选实现
+   */
+   @FeignClient(value = "SPRINGCLOUD-PROVIDER-DEPT-HYSTRIX",fallbackFactory = DeptServiceFallbackFactory.class)
+   public interface DeptService {
+       @PostMapping("/dept")
+       boolean addDept(Dept dept);
+       @GetMapping("/dept/{id}")
+       Dept queryDeptById(@PathVariable("id") Long id);
+       @GetMapping("/dept")
+       List<Dept> queryAll();
+   }  
+   ```
+
+### Hystrix Dashbord
+
+- 能配置,能看懂就行...
+
+# 路由网关Zuul
+
+概述:
+
+### 什么是Zuul?
+
+Zuul包含了对请求的路由和过滤两个最主要的功能:
+
+其中路由功能负责将外部请求转发到具体的微服务实例上，是实现外部访问统一入口的基础， 而过滤器功能则负责对请求的处理过程进行干预，是实现请求校验,服务聚合等功能的基础。Zuul和Eureka进行整合, 将Zuul自身注册为Eureka服务治理下的应用,同时从Eureka中获得其他微服务的消息，也即以后的访问微服务都是通过Zuul跳转后获得。
+
+**注意: Zuul服务最终还是会注册进Eureka**
+
+提供:代理+路由+过滤三大功能!(貌似Nginx都能做撒...)
+
+### Zuul能干嘛?
+
+- 路由
+- 过滤
+
+### Zuul的使用
+
+1. 导入依赖
+
+   ```xml
+   <dependency>
+       <groupId>org.springframework.cloud</groupId>
+       <artifactId>spring-cloud-starter-netflix-zuul</artifactId>
+       <version>2.2.6.RELEASE</version>
+   </dependency>
+   ```
+
+2. 启动类上标记**@EnableZuulProxy**
+
+3. 修改配置
+
+   ```yaml
+   # 需要注入eureka才能对其他服务进行路由转发
+   eureka:
+     client:
+       service-url:
+         # 集群部署的话,写多个用","分割
+         defaultZone: http://eureka01.66-77.cc:7001/eureka,http://eureka02.66-77.cc:7002/eureka,http://eureka03.66-77.cc:7003/eureka
+     instance:
+       # 修改注册时使用的默认描述信息
+       instance-id: ${spring.application.name}-${server.port}
+       hostname: zuul.66-77.cc
+   ```
+
+4. 路由定制
+
+   ```yaml
+   zuul:
+     routes:
+       # 服务名到路径的映射
+       consumer.serviceID: springcloud-consumer-dept-feign
+       consumer.path: /consumer/**
+       provider.serviceID: springcloud-provider-dept-hystrix
+       provider.path: /provider/**
+     ignored-services:
+       # 禁用原本的服务名访问 使用"*"可以隐藏全部
+       - springcloud-consumer-dept-feign
+       - springcloud-provider-dept-hystrix
+   ```
+
+# SpringCloudConfig
+
+Spring Cloud Config项目是一个解决分布式系统的配置管理方案。它包含了Client和Server两个部分，server提供配置文件的存储、以接口的形式将配置文件的内容提供出去，client通过接口获取数据、并依据此数据初始化自己的应用。
+
+### 服务端:一盒新的服务
+
+1. 导入依赖
+
+   ```xml
+   <!-- Spring-Cloud-Config-Server -->
+   <dependency>
+     <groupId>org.springframework.cloud</groupId>
+     <artifactId>spring-cloud-config-server</artifactId>
+     <version>2.2.6.RELEASE</version>
+   </dependency>
+   ```
+
+2. 启动类上标记**@EnableConfigServer**
+
+3. 配置
+
+   ```yaml
+   server:
+     port: 3344
+   spring:
+     application:
+       name: SpringCloud-Config-Server
+     cloud:
+       config:
+         server:
+           git:
+             # git地址,使用git协议的话,需要给主机加上github的指纹等配置,比较麻烦
+             uri: https://github.com/Sowevo/SpringCloud-Config.git
+             # 默认使用的分支
+             default-label: main
+             # 认证的账号密码,因为是个私有的git地址,需要认证
+             password: *********
+             username: *********
+             # 可以根据项目名建一个二级文件夹,便于管理
+             search-paths: '{application}'
+             # 启动时克隆项目
+             clone-on-start: true
+   ```
+
+### 客户端
+
+已有的服务加入从远端获取配置文件的功能
+
+1. 导入依赖
+
+   ```xml
+   <!-- Spring-Cloud-Config-Client -->
+   <dependency>
+     <groupId>org.springframework.cloud</groupId>
+     <artifactId>spring-cloud-starter-config</artifactId>
+     <version>2.2.6.RELEASE</version>
+   </dependency>
+   ```
+
+2. 新增bootstrap.yaml
+
+   ```yaml
+   spring:
+     cloud:
+       config:
+         # 指定注册中心Config-Server的地址
+         uri: http://config.66-77.cc:3344/
+     application:
+       # 指定服务名称,对应的是配置仓库中的二级文件夹,需要在服务端加上search-paths: '{application}'
+       name: consumer-dept
+   ```
+
+3. 配置文件加入git仓库
+
+
+
+
+
+
 
