@@ -1,75 +1,180 @@
-# SpringBoot
-
-## 什么是微服务
+# 什么是微服务
 
 - 先读一下微服务的[介绍](../../martinfowler-microservices-zh-cn.md)
 
-## 第一个spring程序
+# 第一个spring程序
 
 - [官网](https://start.spring.io/)提供的在线生成方式,下载导入IDEA使用
 - IDEA集成的生成方式,直接在IDEA中使用
 
-## 原理初探
+# 原理初探
 
-### 自动装配
+## 依赖管理
 
-- pom.xml
+- 父项目做依赖管理
 
-  - 依赖在父工程中
-  - 我们引入一些Springboot依赖时,不需要指定版本,因为有这些版本仓库配置
+- 几乎声明了所有开发中常用的依赖的版本号,自动版本仲裁机制
 
-- 启动器
+- 我们引入一些Springboot依赖时,不需要指定版本,因为有这些版本仓库配置
 
-  - ```xml
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-    ```
+- 我们可以修改默认版本号
 
-  - Springboot的启动场景:比如`spring-boot-starter-web`,他会帮我们导入web环境的依赖
-
-  - springboot会将所有的功能场景,都变成一个一个的启动器,如果要使用什么功能,就只需要找到对应的启动器`start`
-
-- 主程序
-
-  ```java
-  @SpringBootApplication//标注这个类时一个SpringBoot的应用
-  public class Springboot01HelloworldApplication {
-    public static void main(String[] args) {
-      //将SpringBoot启动
-      SpringApplication.run(Springboot01HelloworldApplication.class, args);
-    }
-  }
+  ```xml
+  <!--
+  查看spring-boot-dependencies里面规定当前依赖的版本 用的 key。
+  在当前项目里面重写配置
+  -->
+  <properties>
+    <mysql.version>5.1.43</mysql.version>
+  </properties>
   ```
 
-  - 注解
-    - @SpringBootConfiguration:Spring的配置
-      - @Configuration:Spring配置类
-        - @Component:这是一个Spring组件
-    - @EnableAutoConfiguration:自动配置
-      - @AutoConfigurationPackage:自动配置包
-        - @Import(AutoConfigurationPackages.Registrar.class):自动配置`包注册`
-      - @Import(AutoConfigurationImportSelector.class):自动导入选择器
-        - AutoConfigurationImportSelector.getCandidateConfigurations
-          - 从`META-INF/spring.factories`中找到自动配置
-          - 根据不同的自动配置会根据自己需要的包有没有导入为条件,决定是否生效
+## Starter场景启动器
 
-- <font color=red>自动装配总结!</font>
+Spring官方的启动器[文档链接](https://docs.spring.io/spring-boot/docs/current/reference/html/using-spring-boot.html#using-boot-starter)
 
-  0. 自动装配主要在spring-boot-autoconfigure包
-  1. 启动时,从包里的配置文件中加载所有的自动配置类XXXAutoConfiguration
-  2. 判断是否启用:根据具体的自动配置类上面的注解
-     1. 是不是WEB项目
-     2. 自动配置类的依赖包有没有引入
-     3. 配置文件中相关属性有没有启用
-  3. 使用@ConfigurationProperties注解从配置文件中提取相关配置文件
-  4. 配置完成后给加入到Spring容器里面
-  5. 以前需要手动做的配置,自动配置类都给做了
+- Spring官方提供的启动器命名:`spring-boot-starter-*`
 
-### SpringApplication.run启动流程
+- 第三方项目提供的启动器命名`*-spring-boot-starter`
 
-![](https://up.sowevo.com/img/20201215153540.png)
+- 只要引入starter，这个场景的所有常规需要的依赖我们都自动引入SpringBoot所有支持的场景
+
+  ```xml
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter</artifactId>
+    <version>2.3.4.RELEASE</version>
+    <scope>compile</scope>
+  </dependency>
+  ```
+
+## 自动配置
+
+- 自动配好Tomcat
+
+  - 引入Tomcat依赖。
+  - 配置Tomcat
+- 自动配好SpringMVC
+  - 引入SpringMVC全套组件
+  - 自动配好SpringMVC常用组件（功能）
+- 自动配好Web常见功能，如：字符编码问题
+
+  - SpringBoot帮我们配置好了所有web开发的常见场景
+- 各种配置拥有默认值
+
+  - 默认配置最终都是映射到某个类上，如：MultipartProperties
+
+  - 配置文件的值最终会绑定每个类上，这个类会在容器中创建对象
+
+- 按需加载所有自动配置项
+
+  - 非常多的starter
+  - 引入了哪些场景这个场景的自动配置才会开启
+  - SpringBoot所有的自动配置功能都在 spring-boot-autoconfigure 包里面
+
+## 容器功能
+
+1. **@Configuration**相当于原来的一段配置文件
+   - 两种启动模式
+     - Full(proxyBeanMethods = true)  :@Bean方法被调用返回的是容器中的对象
+     - Lite(proxyBeanMethods = false) :@Bean方法被调用返回的是新建的对象
+     - 最佳实践
+       - 配置类组件之间无依赖,用Lite加速容器启动过程,减少判断
+       - 配置类组件之间有依赖,方法会被调用得到之前单实例组件,用Full模式
+   
+2. **@Bean**相当于原来的配置文件中的一个<bean>标签,new一个对象返回
+
+3. **@Component,@Controller,@Service,@Repository**容器组件注解
+
+4. **@ComponentScan**默认会扫描该类所在的包下所有的配置类,相当于之前的 <context:component-scan>。
+
+5. **@Import**往容器中导入配置类,导入其他自定义类
+
+6. **@Conditional**满足指定的条件则进行组件注入
+
+   ![image.png](https://up.sowevo.com/img/20201227003002.png)
+
+7. **@ConfigurationProperties**读取配置文件:一定要写set方法
+
+   - 两种写法
+
+   - @EnableConfigurationProperties+@ConfigurationProperties
+
+     ```java
+     @EnableConfigurationProperties(MyConfig.class)   //需要标记在另一个组件上
+     //====================
+    @ConfigurationProperties(prefix = "myconfig")
+     public class MyConfig {
+      public String name;
+         public Integer price;
+     
+         public void setName(String name) {
+             this.name = name;
+         }
+     
+         public void setPrice(Integer price) {
+             this.price = price;
+         }
+     }
+     ```
+   
+   - @Component+@ConfigurationProperties
+   
+     ```java
+     @Component
+    @ConfigurationProperties(prefix = "myconfig")
+     public class MyConfig {
+         public String name;
+         public Integer price;
+     
+         public void setName(String name) {
+             this.name = name;
+         }
+     
+         public void setPrice(Integer price) {
+             this.price = price;
+         }
+     }
+     ```
+   
+
+## SpringApplication.run启动流程
+
+@SpringBootApplication
+- @ComponentScan                                                                                        包扫描
+- @SpringBootConfiguration                                                                         就是一个配置类
+- @EnableAutoConfiguration
+  - @Import({==AutoConfigurationImportSelector.class==})                       重点
+  - @AutoConfigurationPackage
+    - @Import({==AutoConfigurationPackages.Registrar.class==})         重点
+
+### ==AutoConfigurationImportSelector.class==
+
+1. 调用org.springframework.boot.autoconfigure.AutoConfigurationImportSelector#getAutoConfigurationEntry()查找自动注册类
+
+2. 调用org.springframework.boot.autoconfigure.AutoConfigurationImportSelector#getCandidateConfigurations()获取自动配置类
+
+3. 调用org.springframework.core.io.support.SpringFactoriesLoader#loadFactoryNames()                                           获取自动配置类
+
+4. 调用org.springframework.core.io.support.SpringFactoriesLoader#loadSpringFactories()
+
+   ​        获取META-INF/spring.factories配置文件(写死的)
+
+   ​        这里写死了所有要加载的AutoConfiguration自动配置类
+
+5. 根据这一些写死的自动配置类,配合标记的**@Conditional**系列注解,决定要不要启用
+
+   1. 是不是WEB项目
+   2. 自动配置类的依赖包有没有引入
+   3. 配置文件中相关属性有没有启用
+
+6. 根据自动配置类上的@EnableConfigurationProperties({KafkaProperties.class})注解注入配置文件类,并注入进容器
+
+7. 开始根据具体的代码配置相关支持
+
+### ==AutoConfigurationPackages.Registrar.class==
+
+- 将主启动类包下所有的组件注册进去
 
 ## 配置文件
 
@@ -166,9 +271,32 @@ person:
 
   从而实现自动配置,自动加载配置文件
 
-## SpringBoot WEB开发
+## 最佳实践
 
-### 静态资源
+- 引入场景依赖
+
+  - https://docs.spring.io/spring-boot/docs/current/reference/html/using-spring-boot.html#using-boot-starter
+
+- 查看自动配置了哪些（选做）
+
+  - 自己分析，引入场景对应的自动配置一般都生效了
+  - 配置文件中debug=true开启自动配置报告。Negative（不生效）\Positive（生效）
+
+- 是否需要修改
+
+  - 参照文档修改配置项
+  - https://docs.spring.io/spring-boot/docs/current/reference/html/appendix-application-properties.html#common-application-properties
+    - 自己分析。xxxxProperties绑定了配置文件的哪些。
+
+  - 自定义加入或者替换组件
+
+    - @Bean、@Component。。。
+
+  - 自定义器  **XXXXXCustomizer**；
+
+# SpringBoot WEB开发
+
+## 静态资源
 
 - 是否有自定义配置:`spring.mvc.static-path-pattern`,有的话按照自定义的来
 
@@ -181,11 +309,11 @@ person:
   classpath:/static/
   classpath:/public/
 
-### 首页
+## 首页
 
 - 从前面的静态资源目录中寻找index.html文件
 
-### 模板引擎Thymeleaf
+## 模板引擎Thymeleaf
 
 - [官方文档](https://www.thymeleaf.org/documentation.html)
 
@@ -237,11 +365,11 @@ person:
   <td th:text="${#dates.format(emp.getBirth(),'yyyy-mm-dd HH:mm:ss')}"/>  
   ```
 
-### 装配扩展SpringMVC
+## 装配扩展SpringMVC
 
 - 实现自己的@Configuration类,要实现WebMvcConfigurer,之后重写特定的方法来实现对mvc的自定义
 
-### 拦截器
+## 拦截器
 
 - 自己实现拦截器实现HandlerInterceptor
 
@@ -272,7 +400,7 @@ person:
   }  
   ```
 
-### 国际化!
+## 国际化!
 
 - 配置i18n文件
 
@@ -316,7 +444,7 @@ person:
   }
   ```
 
-### 整合mybatis
+## 整合mybatis
 
 - 导包
 
@@ -375,7 +503,7 @@ person:
   }  
   ```
 
-### SpringSecurity(安全!)
+## SpringSecurity(安全!)
 
 - 引入依赖
 
@@ -460,7 +588,7 @@ person:
     <th sec:authorize="hasRole('vip3')">Level 3</th>
     ```
 
-### Shiro(还是安全!)
+## Shiro(还是安全!)
 
 - 三个核心组件
 
@@ -472,7 +600,7 @@ person:
 
     ![img](https://up.sowevo.com/img/20201217203702.png)
 
-### 任务相关
+## 任务相关
 
 - 异步任务
   - 手动创建线程
@@ -540,7 +668,7 @@ person:
     //有多个job时,要同时执行,需要修改默认的 scheduled池大小 spring.task.scheduling.pool.size=10
     ```
 
-### 集成Redis
+## 集成Redis
 
 - SpringBoot2.x之后默认的redis驱动被替换成了lettuce
   - jedis采用的直连,多线程不安全,BIO模式
@@ -597,7 +725,7 @@ person:
 
   <script src="https://gist.github.com/Sowevo/02b79b99dfc97852a457f338e17c439d.js"></script>
 
-### 分布式+Dubbo+Zookeeper+SpringBoot
+## 分布式+Dubbo+Zookeeper+SpringBoot
 
 - Dubbo概述
 
@@ -624,7 +752,7 @@ person:
   - 克隆[项目](https://github.com/apache/dubbo-admin/tree/master)自己打包:注意要用master分支,记得修改配置
   - 启动打好的jar包
 
-### 项目集成Dubbo
+## 项目集成Dubbo
 
 - 启动zookeeper服务
 
