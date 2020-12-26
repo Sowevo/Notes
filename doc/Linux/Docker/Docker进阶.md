@@ -241,5 +241,171 @@ volumes:
    $ docker-compose up -d
    ```
 
-   
 
+# Docker Swarm
+
+## 搞几台服务器
+
+花点小钱,搞4台(1核2G)
+
+并安装Docker
+
+## 工作模式
+
+![Swarm mode cluster](https://up.sowevo.com/img/20201226145356.png)
+
+### Swarm 两种角色
+
+**Manager**：接收客户端服务定义，将任务发送到worker节点；维护集群期望状态和集群管理功能及Leader选举。默认情况下manager节点也会运行任务，也可以配置只做管理任务。
+
+**Worker**：接收并执行从管理节点分配的任务，并报告任务当前状态，以便管理节点维护每个服务期望状态。
+
+------
+
+## 搭建集群
+
+使用Docker Swarm命令
+
+1. 初始化一个manager节点
+
+   ```shell
+   # 初始化一个管理节点
+   $ docker swarm init --advertise-addr=172.17.88.237
+   Swarm initialized: current node (84jg51t5nr7ywlqku2uwpkcm3) is now a manager.
+   
+   To add a worker to this swarm, run the following command:
+   
+       docker swarm join --token SWMTKN-1-55o9kohbport6z73roe1m0532kl55ihc712tt6nrd1mupt0n3q-axx5fxz310o6t237m7dbxvt52 172.17.88.237:2377
+   
+   To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+   ```
+
+2. manager节点生成token
+
+   ```shell
+   # 生成加入工作节点(worker)的token,会直接输出可用的命令,人性化
+   $ docker swarm join-token worker 
+   To add a worker to this swarm, run the following command:
+   
+       docker swarm join --token SWMTKN-1-55o9kohbport6z73roe1m0532kl55ihc712tt6nrd1mupt0n3q-axx5fxz310o6t237m7dbxvt52 172.17.88.237:2377
+   
+   #===#
+   
+   # 生成加入管理节点(manager)的token,会直接输出可用的命令,人性化
+   $ docker swarm join-token manager 
+   To add a manager to this swarm, run the following command:
+   
+       docker swarm join --token SWMTKN-1-55o9kohbport6z73roe1m0532kl55ihc712tt6nrd1mupt0n3q-brfqx08svxov16vbdi4jolpmc 172.17.88.237:2377
+   
+   
+   ```
+
+3. 其他节点加入
+
+   ```shell
+   # 根据token的不同注册过去会有不同的权限~
+   $ docker swarm join --token SWMTKN-1-55o9kohbport6z73roe1m0532kl55ihc712tt6nrd1mupt0n3q-axx5fxz310o6t237m7dbxvt52 172.17.88.237:2377
+   ```
+
+命令的相关用法
+
+```shell
+$ docker swarm COMMAND
+#    ca              
+#    init                       初始化swarm集群
+#          --advertise-addr     <ip|interface>[:port]
+#                               广播地址,本机的IP地址
+#    join                       加入swarm集群
+#    join-token                 (worker|manager)
+#                               生成一个加入的令牌,指定令牌的类型,其他机器加入集群时需要
+#    leave                      离开swarm集群
+#    unlock      
+#    unlock-key  
+#    update      
+```
+
+## Raft协议
+
+Raft协议:保证大多数管理节点(manager)存活,集群才能可用
+
+当只有两台管理节点(manager)时,如果挂掉一个,会导致集群不可用
+
+所以一个高可用的Swarm集群至少要有3台管理节点(manager),一台工作节点(Worker)
+
+## Swarm集群中运行项目
+
+### docker service
+
+- 与docker的区别
+
+  - docker run :容器启动,不具有扩容容器的功能
+
+  - docker service :服务启动,具有扩容功能,滚动更新
+
+- **docker service create**部署服务
+
+  ```shell
+  # --name 服务名 -p 端口映射
+  # 部署后四个服务的8080端口都可以访问到这个服务...厉害了我的哥
+  $ docker service create -p 8080:80 --name my-nginx nginx
+  ```
+
+- **docker service ps**查看服务
+
+  ```shell
+  # 查看某个服务运行状态
+  # docker service ps 服务名
+  $ docker service ps my-nginx 
+  
+  
+  # 查看已经在运行的服务
+  $ docker service ls
+  ```
+
+- **docker service scale**服务扩缩容
+
+  ```shell
+  # 将my-nginx服务扩容到3个节点
+  $ docker service update --replicas 3 my-nginx
+  # 两个命令等价
+  $ docker service scale my-nginx=1
+  ```
+
+  服务集群中的任意节点都可以访问,有多个副本可以动态伸缩,实现服务的高可用
+
+- **docker service rm**服务删除
+
+  ```shell
+  # 讲一个服务删除
+  $ docker service rm my-nginx
+  ```
+
+## 总结
+
+- **swarm**:集群的管理和编排.Docker开一初始化一个swarm集群,其他节点可以以**Manager**或者**Worker**身份加入进来
+- **Node**:就是一个Docker节点,多个节点组成一个集群
+- **Services**:任务,可以在管理节点或者工作节点来运行,是核心,用户访问的.
+- **task**:容器内的命令
+
+![image-20201226205204563](https://up.sowevo.com/img/20201226205204.png)
+
+命令=>管理=>API=>调度=>工作节点(创建Task容器,维护运行)
+
+# DockerStack
+
+Dockercompose的集群版
+
+```shell
+#单机
+$ docker-compose up -d workpress.yaml
+#集群
+$ docker stack deploy workpress.yaml
+```
+
+# Docker Secret
+
+安全,配置密码加密证书
+
+# Docker Config
+
+配置
